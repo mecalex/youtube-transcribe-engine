@@ -128,11 +128,11 @@ if st.button("Çözümlemeyi Başlat"):
             'format': 'bestaudio/best',
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
-            # Bulut IP engellemesini ve 403 filtresini bypass eden en gelişmiş mobil istemci taklidi
-            'impersonate': 'chrome',
+            # Sunucu bağımlılık hatası veren impersonate kaldırıldı
+            # YouTube bot filtresini yasal yoldan aşmak için web_embedded API zorlanıyor
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['ios', 'android'],
+                    'player_client': ['web_embedded', 'web'],
                     'skip': ['webpage', 'hls']
                 }
             },
@@ -144,7 +144,7 @@ if st.button("Çözümlemeyi Başlat"):
             'quiet': True,
         }
         try:
-            with st.spinner("Kaynak ayrıştırılıyor ve ses akışı güvenli tünelle çekiliyor..."):
+            with st.spinner("Kaynak ayrıştırılıyor ve ses akışı çekiliyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=True)
                     video_baslik = info_dict.get('title', 'transkript_output')
