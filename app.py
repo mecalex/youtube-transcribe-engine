@@ -124,26 +124,27 @@ if st.button("Çözümlemeyi Başlat"):
     else:
         gecici_ses = "web_gecici_audio"
         
-      ydl_opts = {
-    'format': 'bestaudio/best',
-    'outtmpl': gecici_ses,
-    'js_runtimes': {'node': {}},
-    # YouTube bot filtresini aşmak için tarayıcı kimliği taklit ediliyor ve mobil API zorlanıyor
-    'impersonate': 'chrome',
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'web_embedded']
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': gecici_ses,
+            'js_runtimes': {'node': {}},
+            # Bulut IP engellemesini ve 403 filtresini bypass eden en gelişmiş mobil istemci taklidi
+            'impersonate': 'chrome',
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['ios', 'android'],
+                    'skip': ['webpage', 'hls']
+                }
+            },
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '128', 
+            }],
+            'quiet': True,
         }
-    },
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '128', 
-    }],
-    'quiet': True,
-}
         try:
-            with st.spinner("Kaynak ayrıştırılıyor..."):
+            with st.spinner("Kaynak ayrıştırılıyor ve ses akışı güvenli tünelle çekiliyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=True)
                     video_baslik = info_dict.get('title', 'transkript_output')
