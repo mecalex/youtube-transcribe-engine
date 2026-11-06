@@ -124,10 +124,17 @@ if st.button("Çözümlemeyi Başlat"):
     else:
         gecici_ses = "web_gecici_audio"
         
-        ydl_opts = {
+      ydl_opts = {
     'format': 'bestaudio/best',
     'outtmpl': gecici_ses,
-    'js_runtimes': {'node': {}}, # Bulutun beklediği yeni sözlük formatı
+    'js_runtimes': {'node': {}},
+    # YouTube bot filtresini aşmak için tarayıcı kimliği taklit ediliyor ve mobil API zorlanıyor
+    'impersonate': 'chrome',
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web_embedded']
+        }
+    },
     'postprocessors': [{
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'mp3',
@@ -135,7 +142,6 @@ if st.button("Çözümlemeyi Başlat"):
     }],
     'quiet': True,
 }
-        
         try:
             with st.spinner("Kaynak ayrıştırılıyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
