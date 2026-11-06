@@ -125,16 +125,16 @@ if st.button("Çözümlemeyi Başlat"):
         gecici_ses = "web_gecici_audio"
         
         ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': gecici_ses,
-            'js_runtimes': ['node'],
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '128', 
-            }],
-            'quiet': True,
-        }
+    'format': 'bestaudio/best',
+    'outtmpl': gecici_ses,
+    'js_runtimes': {'node': {}}, # Bulutun beklediği yeni sözlük formatı
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '128', 
+    }],
+    'quiet': True,
+}
         
         try:
             with st.spinner("Kaynak ayrıştırılıyor..."):
