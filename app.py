@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import re
+import subprocess
 from yt_dlp import YoutubeDL
 from faster_whisper import WhisperModel
 
@@ -16,20 +17,80 @@ def guvenli_dosya_adi(isim):
 
 st.set_page_config(page_title="Transcription Engine", page_icon="⚙️", layout="centered")
 
-# CSS kısmı aynı...
 st.markdown("""
     <style>
-    .stApp { background-color: #1a1f2c !important; font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    .brand-header { font-size: 1.6rem !important; font-weight: 600; color: #e2e8f0 !important; text-align: center; margin-top: 40px; margin-bottom: 4px; letter-spacing: -0.3px; }
-    .brand-sub { color: #8da2bb; text-align: center; font-size: 0.9rem; margin-bottom: 40px; }
-    .stTextInput>div>div>input { background-color: #242b3d !important; color: #f1f5f9 !important; border: 1px solid #334155 !important; border-radius: 6px !important; padding: 12px 16px !important; font-size: 0.95rem !important; transition: all 0.2s ease; }
-    .stTextInput>div>div>input:focus { border-color: #64748b !important; box-shadow: 0 0 0 1px #64748b !important; }
-    .premium-ad-placement { text-align: center; font-size: 0.75rem; color: #475569; margin: 25px 0; text-transform: uppercase; letter-spacing: 0.5px; }
-    div.stButton > button:first-child { background-color: #f1f5f9 !important; color: #0f172a !important; font-weight: 500 !important; font-size: 0.9rem !important; padding: 11px 20px !important; border-radius: 6px !important; border: none !important; width: 100% !important; margin-top: 10px; transition: background-color 0.2s ease !important; }
-    div.stButton > button:first-child:hover { background-color: #e2e8f0 !important; }
-    div[data-testid="stDownloadButton"] > button { background-color: #242b3d !important; color: #f1f5f9 !important; font-weight: 500 !important; font-size: 0.9rem !important; border-radius: 6px !important; border: 1px solid #334155 !important; padding: 11px !important; width: 100% !important; }
-    div[data-testid="stDownloadButton"] > button:hover { background-color: #2e374e !important; border-color: #475569 !important; }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+    .stApp {
+        background-color: #1a1f2c !important;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .brand-header {
+        font-size: 1.6rem !important;
+        font-weight: 600;
+        color: #e2e8f0 !important;
+        text-align: center;
+        margin-top: 40px;
+        margin-bottom: 4px;
+        letter-spacing: -0.3px;
+    }
+    .brand-sub {
+        color: #8da2bb;
+        text-align: center;
+        font-size: 0.9rem;
+        margin-bottom: 40px;
+    }
+    .stTextInput>div>div>input {
+        background-color: #242b3d !important;
+        color: #f1f5f9 !important;
+        border: 1px solid #334155 !important;
+        border-radius: 6px !important;
+        padding: 12px 16px !important;
+        font-size: 0.95rem !important;
+        transition: all 0.2s ease;
+    }
+    .stTextInput>div>div>input:focus {
+        border-color: #64748b !important;
+        box-shadow: 0 0 0 1px #64748b !important;
+    }
+    .premium-ad-placement {
+        text-align: center;
+        font-size: 0.75rem;
+        color: #475569;
+        margin: 25px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    div.stButton > button:first-child {
+        background-color: #f1f5f9 !important;
+        color: #0f172a !important;
+        font-weight: 500 !important;
+        font-size: 0.9rem !important;
+        padding: 11px 20px !important;
+        border-radius: 6px !important;
+        border: none !important;
+        width: 100% !important;
+        margin-top: 10px;
+        transition: background-color 0.2s ease !important;
+    }
+    div.stButton > button:first-child:hover {
+        background-color: #e2e8f0 !important;
+    }
+    div[data-testid="stDownloadButton"] > button {
+        background-color: #242b3d !important;
+        color: #f1f5f9 !important;
+        font-weight: 500 !important;
+        font-size: 0.9rem !important;
+        border-radius: 6px !important;
+        border: 1px solid #334155 !important;
+        padding: 11px !important;
+        width: 100% !important;
+    }
+    div[data-testid="stDownloadButton"] > button:hover {
+        background-color: #2e374e !important;
+        border-color: #475569 !important;
+    }
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -43,50 +104,44 @@ if st.button("Çözümlemeyi Başlat"):
     if not video_url:
         st.warning("İşlem için geçerli bir video bağlantısı tanımlanmadı.")
     else:
-        gecici_ses = "web_gecici_audio"
+        gecici_video = "web_gecici_video.mp4"
+        gecici_ses = "web_gecici_audio.mp3"
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            'outtmpl': gecici_ses,
-            # ÇÖZÜM 1: Sadece en iyi sesi al, video codec'i karıştırmayalım
-            'format': 'bestaudio/best',
-            # ÇÖZÜM 2: Sadece 'web' client kullan (en stabil olan)
+            # Çökmeye yol açan tüm format kodları temizlendi. Doğrudan sabit birleşik MP4 videosunu hedefler.
+            'format': 'best[ext=mp4]',
+            'outtmpl': gecici_video,
+            'js_runtimes': {'node': {}},
+            'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web']
+                    'player_client': ['web_embedded', 'web'],
+                    'skip': ['webpage', 'hls']
                 }
             },
-            'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192', 
-            }],
             'quiet': True,
-            'no_warnings': True,
         }
-        
         try:
-            with st.spinner("Kaynak ayrıştırılıyor..."):
+            with st.spinner("Kaynak ayrıştırılıyor ve video indiriliyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=True)
                     video_baslik = info_dict.get('title', 'transkript_output')
             
-            # Ses dosyası kontrolü (ffmpeg mp3'e çevirir ama bazen .m4a kalabilir)
-            audio_path = f"{gecici_ses}.mp3"
-            if not os.path.exists(audio_path):
-                 if os.path.exists(f"{gecici_ses}.m4a"):
-                     audio_path = f"{gecici_ses}.m4a"
-                 elif os.path.exists(f"{gecici_ses}.webm"):
-                     audio_path = f"{gecici_ses}.webm"
-                 else:
-                    raise Exception("Ses dosyası bulunamadı. Lütfen tekrar deneyin.")
-
             guvenli_baslik = guvenli_dosya_adi(video_baslik)
+            
+            with st.spinner("Ses katmanı videodan bağımsız olarak ayrıştırılıyor..."):
+                # yt-dlp bağımlılığından kurtulup, FFmpeg'i doğrudan Linux işletim sisteminde tetikliyoruz.
+                ffmpeg_cmd = [
+                    'ffmpeg', '-y', '-i', gecici_video, 
+                    '-vn', '-acodec', 'libmp3lame', '-ar', '16000', '-ac', '1', '-ab', '128k', 
+                    gecici_ses
+                ]
+                subprocess.run(ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
             
             with st.spinner("Metinleştirme motoru çalışıyor..."):
                 model = WhisperModel("tiny", device="cpu", compute_type="int8")
-                segments, info = model.transcribe(audio_path, beam_size=3)
+                segments, info = model.transcribe(gecici_ses, beam_size=3)
                 
                 srt_icerik = ""
                 for i, segment in enumerate(segments, start=1):
@@ -107,29 +162,10 @@ if st.button("Çözümlemeyi Başlat"):
             st.error(f"Sistem raporu hatası: {e}")
             
         finally:
-            # Temizlik
-            for ext in ['.mp3', '.m4a', '.webm']:
-                temp_file = gecici_ses + ext
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
+            # Geçici dosyaların temizlenmesi
+            if os.path.exists(gecici_video):
+                os.remove(gecici_video)
+            if os.path.exists(gecici_ses):
+                os.remove(gecici_ses)
 
 st.markdown('<div class="premium-ad-placement" style="margin-top: 50px;">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
-```Yukarıdaki kod bloğu tamamlanmıştı; ancak hatanın kök nedenini ve **kalıcı çözümünü** netleştirmek için devam ediyorum.
-
-### 🔍 Hatanın Gerçek Nedeni (Kök Analiz)
-
-`Requested format is not available` hatası, kodunuzdan çok **iki dış faktörden** kaynaklanıyor:
-
-1. **`yt-dlp` sürümü eski:** YouTube, 2025–2026 döneminde `sig`/`nsig` çözmeyi tamamen Node.js tabanlı `player` istemcisine taşıdı. Eski `yt-dlp`, format listesini **boş** döndürür → "format available değil" hatası alırsınız.
-2. **Streamlit Cloud'da Node.js yok:** `js_runtimes: {'node': {}}` satırınız buluta deploy edildiğinde çalışmaz, çünkü orada Node kurulu değildir. Bu yüzden `web` client bile format üretemez.
-
----
-
-### ✅ Kesin Çözüm — 3 Adım
-
-**Adım 1 — `requirements.txt` (kritik):**
-```text
-streamlit>=1.40
-yt-dlp>=2025.10.14
-faster-whisper>=1.1.0
-ffmpeg-python
