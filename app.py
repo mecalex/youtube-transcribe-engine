@@ -124,12 +124,15 @@ if st.button("Çözümlemeyi Başlat"):
     else:
         gecici_ses = "web_gecici_audio"
         
+        # Bulut sunucunun dizin yapısına göre cookies.txt yolunu kesinleştiriyoruz
+        cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
+        
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
-            # Sunucu bağımlılık hatası veren impersonate kaldırıldı
-            # YouTube bot filtresini yasal yoldan aşmak için web_embedded API zorlanıyor
+            # YouTube bot filtresini ve "Sign in" kısıtlamasını tamamen deaktif eden entegrasyon
+            'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
             'extractor_args': {
                 'youtube': {
                     'player_client': ['web_embedded', 'web'],
@@ -144,7 +147,7 @@ if st.button("Çözümlemeyi Başlat"):
             'quiet': True,
         }
         try:
-            with st.spinner("Kaynak ayrıştırılıyor ve ses akışı çekiliyor..."):
+            with st.spinner("Kaynak ayrıştırılıyor ve ses akışı doğrulanıyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=True)
                     video_baslik = info_dict.get('title', 'transkript_output')
