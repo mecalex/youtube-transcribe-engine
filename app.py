@@ -1,9 +1,9 @@
 import streamlit as st
 import os
-import re
 import requests
 import json
 import xml.etree.ElementTree as ET
+from urllib.parse import urlparse, parse_qs
 
 def saniye_to_srt_zaman(saniye):
     saat = int(saniye // 3600)
@@ -13,16 +13,37 @@ def saniye_to_srt_zaman(saniye):
     return f"{saat:02d}:{dakika:02d}:{sn:02d},{milisaniye:03d}"
 
 def guvenli_dosya_adi(isim):
+    import re
     return re.sub(r'[\\/*?:"<>|]', "", isim)
 
-def youtube_id_bul(url):
-    # Kullanıcı yanlışlıkla sadece 11 haneli Video ID girse bile sistemi bozmaz
-    if len(url.strip()) == 11 and re.match(r'^[a-zA-Z0-9_-]{11}$', url.strip()):
-        return url.strip()
-    # Gelişmiş regex tüneli; yapıştırılan her türlü kirli URL'den sadece ID'yi çeker
-    pattern = r'(?:v=|\/v\/|embed\/|youtu\.be\/|\/shorts\/|^)([a-zA-Z0-9_-]{11})'
-    match = re.search(pattern, url)
-    return match.group(1) if match else None
+def youtube_id_temizle(url_girdi):
+    url_girdi = url_girdi.strip()
+    # Eğer doğrudan 11 haneli temiz ID girildiyse güvenle döndür
+    if len(url_girdi) == 11 and "/" not in url_girdi and "=" not in url_girdi:
+        return url_girdi
+        
+    try:
+        parsed_url = urlparse(url_girdi)
+        # Kısaltılmış bağlantı tüneli (youtu.be/ID)
+        if parsed_url.hostname in ('youtu.be', 'www.youtu.be'):
+            return parsed_url.path[1:12]
+            
+        # Standart, mobil, shorts ve gömülü bağlantı mimarileri
+        if parsed_url.hostname in ('youtube.com', '://youtube.com', '://youtube.com'):
+            if parsed_url.path == '/watch':
+                query_params = parse_qs(parsed_url.query)
+                v_list = query_params.get('v')
+                # Hatalı köşeli parantez sızıntısını önleyen kesin string dönüşümü [0]
+                if v_list and isinstance(v_list, list):
+                    return v_list[0].strip()
+            if parsed_url.path.startswith(('/embed/', '/v/', '/shorts/')):
+                parts = parsed_url.path.split('/')
+                for part in parts:
+                    if part and len(part.strip()) == 11:
+                        return part.strip()
+    except Exception:
+        pass
+    return None
 
 st.set_page_config(page_title="Transcription Engine", page_icon="⚙️", layout="centered")
 
@@ -56,10 +77,6 @@ st.markdown("""
         font-size: 0.95rem !important;
         transition: all 0.2s ease;
     }
-    .stTextInput>div>div>input:focus {
-        border-color: #64748b !important;
-        box-shadow: 0 0 0 1px #64748b !important;
-    }
     .premium-ad-placement {
         text-align: center;
         font-size: 0.75rem;
@@ -78,10 +95,6 @@ st.markdown("""
         border: none !important;
         width: 100% !important;
         margin-top: 10px;
-        transition: background-color 0.2s ease !important;
-    }
-    div.stButton > button:first-child:hover {
-        background-color: #e2e8f0 !important;
     }
     div[data-testid="stDownloadButton"] > button {
         background-color: #242b3d !important;
@@ -93,10 +106,6 @@ st.markdown("""
         padding: 11px !important;
         width: 100% !important;
     }
-    div[data-testid="stDownloadButton"] > button:hover {
-        background-color: #2e374e !important;
-        border-color: #475569 !important;
-    }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -106,7 +115,7 @@ st.markdown("""
 st.markdown('<div class="brand-header">transcribe.engine</div>', unsafe_allow_html=True)
 st.markdown('<div class="brand-sub">Yapay zekâ destekli profesyonel ses deşifre ve altyazı servis istasyonu.</div>', unsafe_allow_html=True)
 
-# 💰 REKLAM YERLEŞİMİ 1 (Göz Dostu Üst Reklam Bandı)
+# 💰 REKLAM BANNER ALANI 1 (Google AdSense Entegrasyonuna Hazır)
 st.markdown('<div class="premium-ad-placement">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
 
 video_url = st.text_input("YOUTUBE URL", placeholder="YouTube video bağlantısını buraya girin...", label_visibility="collapsed")
@@ -115,13 +124,13 @@ if st.button("Çözümlemeyi Başlat"):
     if not video_url:
         st.warning("İşlem için geçerli bir video bağlantısı tanımlanmadı.")
     else:
-        video_id = youtube_id_bul(video_url)
+        video_id = youtube_id_temizle(video_url)
         if not video_id:
-            st.error("Geçerli bir YouTube Video ID'si tespit edilemedi. Lütfen linki tam ve doğru girin.")
+            st.error("Girdiğiniz bağlantıdan Video ID'si ayıklanamadı. Lütfen geçerli bir tam YouTube linki girin.")
         else:
             try:
-                with st.spinner("Yapay zekâ resmi transkript veri kanallarına sızıyor..."):
-                    api_url = f"https://youtube.com{video_id}"
+                with st.spinner("Yapay zekâ transkript veri kanallarına sızıyor..."):
+                    api_url = f"https://://youtube.com/watch?v={video_id}"
                     headers = {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                         'Accept-Language': 'tr,tr-TR;q=0.9,en-US;q=0.8,en;q=0.7'
@@ -130,6 +139,7 @@ if st.button("Çözümlemeyi Başlat"):
                     response = requests.get(api_url, headers=headers, timeout=15)
                     html_data = response.text
                     
+                    import re
                     baslik_match = re.search(r'<title>(.*?)</title>', html_data)
                     video_baslik = baslik_match.group(1).replace("- YouTube", "").strip() if baslik_match else "transkript_output"
                     guvenli_baslik = guvenli_dosya_adi(video_baslik)
@@ -137,26 +147,27 @@ if st.button("Çözümlemeyi Başlat"):
                     captions_match = re.search(r'"playerCaptionsTracklistRenderer":\s*({.*?})', html_data)
                     
                     if not captions_match:
-                        st.error("Bu videoya ait herhangi bir resmi transkript veya altyazı verisi bulunamadı.")
+                        st.error("Bu videoda indirilebilir resmi altyazı veya otomatik transkript bulunamadı.")
                     else:
                         captions_json = json.loads(captions_match.group(1))
                         caption_tracks = captions_json.get('captionTracks', [])
                         
                         target_track = None
-                        for track in caption_tracks:
-                            if track.get('languageCode') == 'tr':
-                                target_track = track
-                                break
-                        if not target_track:
+                        if isinstance(caption_tracks, list) and len(caption_tracks) > 0:
                             for track in caption_tracks:
-                                if track.get('languageCode') == 'en':
+                                if track.get('languageCode') == 'tr':
                                     target_track = track
                                     break
-                        if not target_track and caption_tracks:
-                            target_track = caption_tracks
-                            
-                        if not target_track:
-                            st.error("Transkript veri tüneli oluşturulamadı.")
+                            if not target_track:
+                                for track in caption_tracks:
+                                    if track.get('languageCode') == 'en':
+                                        target_track = track
+                                        break
+                            if not target_track:
+                                target_track = caption_tracks[0]
+                                
+                        if not target_track or not isinstance(target_track, dict):
+                            st.error("Uyumlu dil kanalı bulunamadı.")
                         else:
                             base_sub_url = target_track.get('baseUrl')
                             if "&fmt=" not in base_sub_url:
@@ -188,7 +199,7 @@ if st.button("Çözümlemeyi Başlat"):
                                 mime="text/plain"
                             )
             except Exception as e:
-                st.error(f"Sistem raporu hatası: {e}")
+                st.error(f"Sistem hatası: {e}")
 
-# 💰 REKLAM YERLEŞİMİ 2 (Göz Dostu Alt Reklam Bandı)
+# 💰 REKLAM BANNER ALANI 2 (Google AdSense Entegrasyonuna Hazır)
 st.markdown('<div class="premium-ad-placement" style="margin-top: 50px;">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
