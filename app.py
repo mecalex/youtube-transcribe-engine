@@ -1,39 +1,35 @@
 import streamlit as st
 import os
-import requests
-import json
-import xml.etree.ElementTree as ET
 import re
-from urllib.parse import urlparse, parse_qs
+import tempfile
+import yt_dlp
+from yt_dlp import YoutubeDL
+from faster_whisper import WhisperModel
+
 
 def saniye_to_srt_zaman(saniye):
+    """Saniye cinsinden zamanı SRT formatına çevirir."""
     saat = int(saniye // 3600)
     dakika = int((saniye % 3600) // 60)
     sn = int(saniye % 60)
     milisaniye = int((saniye - int(saniye)) * 1000)
     return f"{saat:02d}:{dakika:02d}:{sn:02d},{milisaniye:03d}"
 
+
 def guvenli_dosya_adi(isim):
+    """Dosya adından geçersiz karakterleri temizler."""
     return re.sub(r'[\\/*?:"<>|]', "", isim)
 
-def youtube_id_temizle(url_girdi):
-    url_girdi = url_girdi.strip()
-    
-    # Doğrudan 11 haneli temiz ID girildiyse güvenle döndür
-    if len(url_girdi) == 11 and "/" not in url_girdi and "=" not in url_girdi:
-        return url_girdi
-        
-    # Tüm YouTube varyasyonlarını (shorts, m., www., zaman damgası ve si parametresi) çözen regex mimarisi
-    pattern = r'(?:https?:\/\/)?(?:www\.|m\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|shorts\/|watch\?v=|watch\?.+&v=))([\w-]{11})'
-    
-    match = re.search(pattern, url_girdi)
-    if match:
-        return match.group(1)
-        
-    return None
 
-st.set_page_config(page_title="Transcription Engine", page_icon="⚙️", layout="centered")
+st.set_page_config(
+    page_title="Transcription Engine",
+    page_icon="⚙️",
+    layout="centered"
+)
 
+# ============================================
+# CSS STYLES
+# ============================================
 st.markdown("""
     <style>
     .stApp {
@@ -55,7 +51,7 @@ st.markdown("""
         font-size: 0.9rem;
         margin-bottom: 40px;
     }
-    .stTextInput>div>div>input {
+    .stTextInput > div > div > input {
         background-color: #242b3d !important;
         color: #f1f5f9 !important;
         border: 1px solid #334155 !important;
@@ -63,6 +59,10 @@ st.markdown("""
         padding: 12px 16px !important;
         font-size: 0.95rem !important;
         transition: all 0.2s ease;
+    }
+    .stTextInput > div > div > input:focus {
+        border-color: #64748b !important;
+        box-shadow: 0 0 0 1px #64748b !important;
     }
     .premium-ad-placement {
         text-align: center;
@@ -82,6 +82,10 @@ st.markdown("""
         border: none !important;
         width: 100% !important;
         margin-top: 10px;
+        transition: background-color 0.2s ease !important;
+    }
+    div.stButton > button:first-child:hover {
+        background-color: #e2e8f0 !important;
     }
     div[data-testid="stDownloadButton"] > button {
         background-color: #242b3d !important;
@@ -93,100 +97,143 @@ st.markdown("""
         padding: 11px !important;
         width: 100% !important;
     }
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    div[data-testid="stDownloadButton"] > button:hover {
+        background-color: #2e374e !important;
+        border-color: #475569 !important;
+    }
+    #MainMenu { visibility: hidden; }
+    footer { visibility: hidden; }
+    header { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
 
+# ============================================
+# BRANDING
+# ============================================
 st.markdown('<div class="brand-header">transcribe.engine</div>', unsafe_allow_html=True)
-st.markdown('<div class="brand-sub">Yapay zekâ destekli profesyonel ses deşifre ve altyazı servis istasyonu.</div>', unsafe_allow_html=True)
-
-# 💰 REKLAM BANNER ALANI 1 (Google AdSense Entegrasyonuna Hazır)
+st.markdown('<div class="brand-sub">Yapay zeka destekli profesyonel ses deşifre ve altyazi servis istasyonu.</div>', unsafe_allow_html=True)
 st.markdown('<div class="premium-ad-placement">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
 
-video_url = st.text_input("YOUTUBE URL", placeholder="YouTube video bağlantısını buraya girin...", label_visibility="collapsed")
+# ============================================
+# INPUT
+# ============================================
+video_url = st.text_input(
+    "YOUTUBE URL",
+    placeholder="YouTube video baglantisini buraya girin...",
+    label_visibility="collapsed"
+)
 
-if st.button("Çözümlemeyi Başlat"):
+if st.button("Cozumlemeyi Baslat"):
     if not video_url:
-        st.warning("İşlem için geçerli bir video bağlantısı tanımlanmadı.")
+        st.warning("Islem icin gecerli bir video baglantisi tanimlanmadi.")
     else:
-        video_id = youtube_id_temizle(video_url)
-        if not video_id:
-            st.error("Girdiğiniz bağlantıdan Video ID'si ayıklanamadı. Lütfen geçerli bir tam YouTube linki girin.")
-        else:
-            try:
-                with st.spinner("Yapay zekâ transkript veri kanallarına sızıyor..."):
-                    # Protokol hatası (https://://) düzeltildi
-                    api_url = f"https://youtube.com{video_id}"
-                    headers = {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept-Language': 'tr,tr-TR;q=0.9,en-US;q=0.8,en;q=0.7'
-                    }
-                    
-                    response = requests.get(api_url, headers=headers, timeout=15)
-                    html_data = response.text
-                    
-                    baslik_match = re.search(r'<title>(.*?)</title>', html_data)
-                    video_baslik = baslik_match.group(1).replace("- YouTube", "").strip() if baslik_match else "transkript_output"
-                    guvenli_baslik = guvenli_dosya_adi(video_baslik)
-                    
-                    captions_match = re.search(r'"playerCaptionsTracklistRenderer":\s*({.*?})', html_data)
-                    
-                    if not captions_match:
-                        st.error("Bu videoda indirilebilir resmi altyazı veya otomatik transkript bulunamadı.")
-                    else:
-                        captions_json = json.loads(captions_match.group(1))
-                        caption_tracks = captions_json.get('captionTracks', [])
-                        
-                        target_track = None
-                        if isinstance(caption_tracks, list) and len(caption_tracks) > 0:
-                            for track in caption_tracks:
-                                if track.get('languageCode') == 'tr':
-                                    target_track = track
-                                    break
-                            if not target_track:
-                                for track in caption_tracks:
-                                    if track.get('languageCode') == 'en':
-                                        target_track = track
-                                        break
-                            if not target_track:
-                                target_track = caption_tracks[0]
-                                
-                        if not target_track or not isinstance(target_track, dict):
-                            st.error("Uyumlu dil kanalı bulunamadı.")
-                        else:
-                            base_sub_url = target_track.get('baseUrl')
-                            if "&fmt=" not in base_sub_url:
-                                base_sub_url += "&fmt=srv1"
-                                
-                            sub_response = requests.get(base_sub_url, headers=headers, timeout=15)
-                            xml_data = sub_response.text
-                            
-                            srt_icerik = ""
-                            root = ET.fromstring(xml_data.encode('utf-8'))
-                            for i, text_node in enumerate(root.findall('text'), start=1):
-                                start = float(text_node.attrib.get('start', 0))
-                                dur = float(text_node.attrib.get('dur', 0))
-                                end = start + dur
-                                
-                                start_time = saniye_to_srt_zaman(start)
-                                end_time = saniye_to_srt_zaman(end)
-                                metin = text_node.text or ""
-                                metin = metin.replace('&amp;', '&').replace('&quot;', '"').replace('&#39;', "'")
-                                
-                                srt_icerik += f"{i}\n{start_time} --> {end_time}\n{metin.strip()}\n\n"
-                            
-                            st.markdown("<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; text-align: center; margin-top: 15px;'>İşlem başarıyla tamamlandı!</p>", unsafe_allow_html=True)
-                            
-                            st.download_button(
-                                label="Dosyayı İndir (.SRT)",
-                                data=srt_icerik.encode('utf-8'),
-                                file_name=f"{guvenli_baslik}.srt",
-                                mime="text/plain"
-                            )
-            except Exception as e:
-                st.error(f"Sistem hatası: {e}")
+        gecici_ses = "web_gecici_audio"
 
-# 💰 REKLAM BANNER ALANI 2 (Google AdSense Entegrasyonuna Hazır)
+        # ============================================
+        # YT-DLP AYARLARI — GÜNCEL VE GÜVENİLİR
+        # ============================================
+        ydl_opts = {
+            'outtmpl': gecici_ses + '.%(ext)s',
+            'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
+            'noplaylist': True,
+            'quiet': False,
+            'no_warnings': False,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['web', 'android', 'ios'],
+                }
+            },
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        }
+
+        try:
+            # ===== 1. VIDEO BILGISINI AL =====
+            with st.spinner("Kaynak ayristiriliyor..."):
+                with YoutubeDL(ydl_opts) as ydl:
+                    info_dict = ydl.extract_info(video_url, download=True)
+                    video_baslik = info_dict.get('title', 'transkript_output')
+
+            # ===== 2. SES DOSYASINI BUL =====
+            audio_path = None
+            for ext in ['.mp3', '.m4a', '.webm']:
+                candidate = gecici_ses + ext
+                if os.path.exists(candidate):
+                    audio_path = candidate
+                    break
+
+            if not audio_path:
+                # Dosya ismini tam olarak bulmak icin ydl_opts'a outtmpl yazdiralim
+                remaining_files = [f for f in os.listdir('.') if f.startswith(gecici_ses)]
+                raise Exception(
+                    f"Ses dosyasi bulunamadi! Kalan dosyalar: {remaining_files}"
+                )
+
+            # ===== 3. WHISPER TRANSCRIPTION =====
+            guvenli_baslik = guvenli_dosya_adi(video_baslik)
+
+            with st.spinner("Metinlestirme motoru calisiyor..."):
+                model = WhisperModel("tiny", device="cpu", compute_type="int8")
+                segments, info = model.transcribe(audio_path, beam_size=3)
+
+                # ===== 4. SRT OLUŞTUR =====
+                srt_icerik = ""
+                for i, segment in enumerate(segments, start=1):
+                    start_time = saniye_to_srt_zaman(segment.start)
+                    end_time = saniye_to_srt_zaman(segment.end)
+                    srt_icerik += f"{i}\n{start_time} --> {end_time}\n{segment.text.strip()}\n\n"
+
+            # ===== 5. BASARI MESAJI =====
+            st.markdown(
+                f"<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; "
+                f"text-align: center; margin-top: 15px;'>"
+                f"Islem tamamlandi. Analiz Dili: {info.language.upper()} "
+                f"(guven: {info.probability:.1%})</p>",
+                unsafe_allow_html=True
+            )
+
+            # ===== 6. INDIRME BUTONU =====
+            st.download_button(
+                label="Dosyayi Indir (.SRT)",
+                data=srt_icerik.encode('utf-8'),
+                file_name=f"{guvenli_baslik}.srt",
+                mime="text/plain"
+            )
+
+        except Exception as e:
+            st.error(f"Sistem raporu hatasi:\n\n{e}")
+            import traceback
+            st.code(traceback.format_exc())
+
+        finally:
+            # ===== 7. TEMIZLIK =====
+            for ext in ['.mp3', '.m4a', '.webm', '.ts']:
+                temp_file = gecici_ses + ext
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+
+# ============================================
+# ALT REKLAM
+# ============================================
 st.markdown('<div class="premium-ad-placement" style="margin-top: 50px;">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
+
+# ============================================
+# TEŞHİS BÖLÜMÜ
+# ============================================
+st.divider()
+with st.expander("🔧 TEŞHİS: yt-dlp sürümü ve format listesi"):
+    st.write(f"**yt-dlp sürümü:** `{yt_dlp.version.__version__}`")
+    test_url = st.text_input("Test URL", value="https://www.youtube.com/watch?v=qdrjjjWwnyM")
+    if st.button("Formatları Sorgula"):
+        try:
+            with YoutubeDL({'quiet': True, 'simulate': True, 'playlist_items': '1'}) as y:
+                i = y.extract_info(test_url, download=False)
+                fmts = i.get('formats', [])
+                st.success(f"Toplam {len(fmts)} format bulundu.")
+                for f in fmts[-25:]:
+                    st.code(f"{f.get('format_id')} | ext={f.get('ext')} | acodec={f.get('acodec')} | vcodec={f.get('vcodec')}")
+        except Exception as ex:
+            st.error(f"Sorgu hatasi: {ex}")
