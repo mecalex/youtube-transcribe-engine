@@ -104,14 +104,16 @@ if st.button("Çözümlemeyi Başlat"):
     if not video_url:
         st.warning("İşlem için geçerli bir video bağlantısı tanımlanmadı.")
     else:
-        gecici_video = "web_gecici_video.mp4"
+        # İndirilecek video uzantısını seçiciye bırakmak için jenerik isim verdik
+        gecici_video_taslak = "web_gecici_video"
         gecici_ses = "web_gecici_audio.mp3"
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            # Çökmeye yol açan tüm format kodları temizlendi. Doğrudan sabit birleşik MP4 videosunu hedefler.
-            'format': 'best[ext=mp4]',
-            'outtmpl': gecici_video,
+            # YouTube manifesto kısıtlamalarını tamamen ezen EN GENEL joker format kalıbı. 
+            # Sunucu IP'sine ne gösterilirse gösterilsin (en kötü/en hafif video dahil) indirmeyi garanti eder.
+            'format': 'best/bestvideo+bestaudio/worst/all',
+            'outtmpl': gecici_video_taslak + '.%(ext)s',
             'js_runtimes': {'node': {}},
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
             'extractor_args': {
@@ -127,13 +129,15 @@ if st.button("Çözümlemeyi Başlat"):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=True)
                     video_baslik = info_dict.get('title', 'transkript_output')
+                    # İnen dosyanın gerçek uzantısını tespit ediyoruz (mp4, mkv, webm vb.)
+                    indirilen_ext = info_dict.get('ext', 'mp4')
             
             guvenli_baslik = guvenli_dosya_adi(video_baslik)
+            gercek_video_yolu = f"{gecici_video_taslak}.{indirilen_ext}"
             
             with st.spinner("Ses katmanı videodan bağımsız olarak ayrıştırılıyor..."):
-                # yt-dlp bağımlılığından kurtulup, FFmpeg'i doğrudan Linux işletim sisteminde tetikliyoruz.
                 ffmpeg_cmd = [
-                    'ffmpeg', '-y', '-i', gecici_video, 
+                    'ffmpeg', '-y', '-i', gercek_video_yolu, 
                     '-vn', '-acodec', 'libmp3lame', '-ar', '16000', '-ac', '1', '-ab', '128k', 
                     gecici_ses
                 ]
@@ -162,9 +166,11 @@ if st.button("Çözümlemeyi Başlat"):
             st.error(f"Sistem raporu hatası: {e}")
             
         finally:
-            # Geçici dosyaların temizlenmesi
-            if os.path.exists(gecici_video):
-                os.remove(gecici_video)
+            # Tüm ihtimallere karşı dinamik temizlik mekanizması
+            for ext in ['mp4', 'mkv', 'webm', '3gp', 'flv']:
+                test_path = f"{gecici_video_taslak}.{ext}"
+                if os.path.exists(test_path):
+                    os.remove(test_path)
             if os.path.exists(gecici_ses):
                 os.remove(gecici_ses)
 
