@@ -115,7 +115,6 @@ if st.button("Çözümlemeyi Başlat"):
         else:
             try:
                 with st.spinner("Yapay zekâ resmi transkript veri kanallarına sızıyor..."):
-                    # YouTube Player API verilerini doğrudan web-klon yöntemiyle çekiyoruz
                     api_url = f"https://youtube.com{video_id}"
                     headers = {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -124,12 +123,10 @@ if st.button("Çözümlemeyi Başlat"):
                     req = urllib.request.Request(api_url, headers=headers)
                     html_data = urllib.request.urlopen(req).read().decode('utf-8')
                     
-                    # Sayfa başlığını ayıklıyoruz
                     baslik_match = re.search(r'<title>(.*?)</title>', html_data)
                     video_baslik = baslik_match.group(1).replace("- YouTube", "").strip() if baslik_match else "transkript_output"
                     guvenli_baslik = guvenli_dosya_adi(video_baslik)
                     
-                    # Sayfa içindeki gizli altyazı tünellerini (playerCaptionsTracklistRenderer) tarıyoruz
                     captions_match = re.search(r'"playerCaptionsTracklistRenderer":\s*({.*?})', html_data)
                     
                     if not captions_match:
@@ -138,7 +135,6 @@ if st.button("Çözümlemeyi Başlat"):
                         captions_json = json.loads(captions_match.group(1))
                         caption_tracks = captions_json.get('captionTracks', [])
                         
-                        # Dil önceliği şablonu: Önce Türkçe, yoksa İngilizce, yoksa ilk sıradaki dil
                         target_track = None
                         for track in caption_tracks:
                             if track.get('languageCode') == 'tr':
@@ -155,7 +151,6 @@ if st.button("Çözümlemeyi Başlat"):
                         if not target_track:
                             st.error("Transkript veri tüneli oluşturulamadı.")
                         else:
-                            # Seçilen altyazı XML URL'sini yakalayıp srv1 standardına zorluyoruz
                             base_sub_url = target_track.get('baseUrl')
                             if "&fmt=" not in base_sub_url:
                                 base_sub_url += "&fmt=srv1"
@@ -177,7 +172,7 @@ if st.button("Çözümlemeyi Başlat"):
                                 
                                 srt_icerik += f"{i}\n{start_time} --> {end_time}\n{metin.strip()}\n\n"
                             
-                            st.markdown("<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; text-align: center; margin-top: 15px;'>İşlem 1 saniyede tamamlandı!</p>", unsafe_allow_html=True)
+                            st.markdown("<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; text-align: center; margin-top: 15px;'>İşlem başarıyla tamamlandı!</p>", unsafe_allow_html=True)
                             
                             st.download_button(
                                 label="Dosyayı İndir (.SRT)",
