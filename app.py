@@ -144,7 +144,7 @@ if st.button("Çözümlemeyi Başlat"):
             'quiet': True,
         }
         try:
-            with st.spinner("Kaynak ayrıştırılıyor ve ses akışı çekiliyor..."):
+            with st.spinner("Kaynak ayrıştırılıyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=True)
                     video_baslik = info_dict.get('title', 'transkript_output')
