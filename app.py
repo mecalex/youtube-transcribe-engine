@@ -107,8 +107,9 @@ if st.button("Çözümlemeyi Başlat"):
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            # Tüm katı format filtreleri kaldırıldı. YouTube bulutta ne sunuyorsa (en hafif birleşik video dahil) indirilir.
-            'format': 'best', 
+            # Format filtresini tamamen devre dışı bırakmak için boş dize atandı.
+            # YouTube manifesto kısıtlamalarını aşmanın ve hatayı engellemenin tek kesin yoludur.
+            'format': '',
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
@@ -118,7 +119,6 @@ if st.button("Çözümlemeyi Başlat"):
                     'skip': ['webpage', 'hls']
                 }
             },
-            # FFmpeg ne inerse insin içindeki ses katmanını ayıklayıp lokalde mp3'e dönüştürür.
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
