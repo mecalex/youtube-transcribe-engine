@@ -107,15 +107,16 @@ if st.button("Çözümlemeyi Başlat"):
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            # Format filtresini tamamen devre dışı bırakmak için boş dize atandı.
-            # YouTube manifesto kısıtlamalarını aşmanın ve hatayı engellemenin tek kesin yoludur.
-            'format': '',
+            # Hatalara yol açan restriktif 'format' anahtarı tamamen kaldırıldı.
+            # Sıralama ve bulma stratejisi akıllı sorting katmanına devredildi.
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
+            'format_sort': ['res:720', 'ext:mp4:m4a', 'vcodec:h264', 'acodec:aac'],
+            'merge_output_format': 'mp4',
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web_embedded', 'web'],
+                    'player_client': ['android', 'web_embedded'],
                     'skip': ['webpage', 'hls']
                 }
             },
