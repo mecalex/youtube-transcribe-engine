@@ -107,17 +107,18 @@ if st.button("Çözümlemeyi Başlat"):
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
+            # Tüm katı format filtreleri kaldırıldı. YouTube bulutta ne sunuyorsa (en hafif birleşik video dahil) indirilir.
+            'format': 'best', 
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
-            'format_sort': ['res:720', 'ext:mp4:m4a', 'vcodec:h264', 'acodec:aac'],
-            'merge_output_format': 'mp4',
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'web_embedded'],
+                    'player_client': ['web_embedded', 'web'],
                     'skip': ['webpage', 'hls']
                 }
             },
+            # FFmpeg ne inerse insin içindeki ses katmanını ayıklayıp lokalde mp3'e dönüştürür.
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
