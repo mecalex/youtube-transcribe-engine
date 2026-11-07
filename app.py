@@ -1,7 +1,9 @@
 import streamlit as st
 import os
 import re
-from yt_dlp import YoutubeDL
+import urllib.request
+import json
+import xml.etree.ElementTree as ET
 
 def saniye_to_srt_zaman(saniye):
     saat = int(saniye // 3600)
@@ -12,6 +14,11 @@ def saniye_to_srt_zaman(saniye):
 
 def guvenli_dosya_adi(isim):
     return re.sub(r'[\\/*?:"<>|]', "", isim)
+
+def youtube_id_bul(url):
+    pattern = r'(?:v=|\/v\/|embed\/|youtu\.be\/|\/shorts\/|^)([a-zA-Z0-9_-]{11})'
+    match = re.search(pattern, url)
+    return match.group(1) if match else None
 
 st.set_page_config(page_title="Transcription Engine", page_icon="⚙️", layout="centered")
 
@@ -102,100 +109,83 @@ if st.button("Çözümlemeyi Başlat"):
     if not video_url:
         st.warning("İşlem için geçerli bir video bağlantısı tanımlanmadı.")
     else:
-        cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
-        
-        ydl_opts = {
-            'skip_download': True,
-            'writesubtitles': True,
-            'writeautomaticsub': True,
-            'subtitleslangs': ['tr', 'en', 'all'],
-            'js_runtimes': {'node': {}},
-            # Liste ayrışma hatasını (String Unpacking) çözen kurumsal liste şablonu
-            'remote_components': ['ejs:github'],
-            'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['web_embedded', 'web'],
-                    'skip': ['webpage', 'hls']
-                }
-            },
-            'quiet': True,
-        }
-        try:
-            with st.spinner("Yapay zekâ transkript verilerini güvenli tünellerden çekiyor..."):
-                with YoutubeDL(ydl_opts) as ydl:
-                    info_dict = ydl.extract_info(video_url, download=False)
-                    video_baslik = info_dict.get('title', 'transkript_output')
+        video_id = youtube_id_bul(video_url)
+        if not video_id:
+            st.error("Geçerli bir YouTube Video ID'si tespit edilemedi.")
+        else:
+            try:
+                with st.spinner("Yapay zekâ resmi transkript veri kanallarına sızıyor..."):
+                    # YouTube Player API verilerini doğrudan web-klon yöntemiyle çekiyoruz
+                    api_url = f"https://youtube.com{video_id}"
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept-Language': 'tr,tr-TR;q=0.9,en-US;q=0.8,en;q=0.7'
+                    }
+                    req = urllib.request.Request(api_url, headers=headers)
+                    html_data = urllib.request.urlopen(req).read().decode('utf-8')
                     
-                    subtitles = info_dict.get('subtitles', {})
-                    automatic_captions = info_dict.get('automatic_captions', {})
-            
-            guvenli_baslik = guvenli_dosya_adi(video_baslik)
-            
-            altyazi_listesi = None
-            if 'tr' in subtitles:
-                altyazi_listesi = subtitles['tr']
-            elif 'tr' in automatic_captions:
-                altyazi_listesi = automatic_captions['tr']
-            elif 'en' in subtitles:
-                altyazi_listesi = subtitles['en']
-            elif 'en' in automatic_captions:
-                altyazi_listesi = automatic_captions['en']
-            elif len(subtitles) > 0:
-                altyazi_listesi = list(subtitles.values())[0] if isinstance(subtitles, dict) else list(subtitles.values())
-            elif len(automatic_captions) > 0:
-                altyazi_listesi = list(automatic_captions.values())[0] if isinstance(automatic_captions, dict) else list(automatic_captions.values())
-                
-            if altyazi_listesi is None:
-                st.error("Bu videoya ait herhangi bir resmi transkript veya altyazı verisi bulunamadı.")
-            else:
-                srv1_url = None
-                if isinstance(altyazi_listesi, list):
-                    for sub in altyazi_listesi:
-                        if sub.get('ext') == 'srv1':
-                            srv1_url = sub.get('url')
-                            break
-                    if not srv1_url and altyazi_listesi:
-                        srv1_url = altyazi_listesi[0].get('url') if isinstance(altyazi_listesi[0], dict) else altyazi_listesi
-                else:
-                    srv1_url = altyazi_listesi.get('url')
+                    # Sayfa başlığını ayıklıyoruz
+                    baslik_match = re.search(r'<title>(.*?)</title>', html_data)
+                    video_baslik = baslik_match.group(1).replace("- YouTube", "").strip() if baslik_match else "transkript_output"
+                    guvenli_baslik = guvenli_dosya_adi(video_baslik)
                     
-                if not srv1_url:
-                    st.error("Transkript veri tüneli oluşturulamadı.")
-                else:
-                    import urllib.request
-                    import xml.etree.ElementTree as ET
+                    # Sayfa içindeki gizli altyazı tünellerini (playerCaptionsTracklistRenderer) tarıyoruz
+                    captions_match = re.search(r'"playerCaptionsTracklistRenderer":\s*({.*?})', html_data)
                     
-                    req = urllib.request.Request(srv1_url, headers={'User-Agent': 'Mozilla/5.0'})
-                    xml_data = urllib.request.urlopen(req).read().decode('utf-8')
-                    
-                    srt_icerik = ""
-                    try:
-                        root = ET.fromstring(xml_data)
-                        for i, text_node in enumerate(root.findall('text'), start=1):
-                            start = float(text_node.attrib.get('start', 0))
-                            dur = float(text_node.attrib.get('dur', 0))
-                            end = start + dur
+                    if not captions_match:
+                        st.error("Bu videoya ait herhangi bir resmi transkript veya altyazı verisi bulunamadı.")
+                    else:
+                        captions_json = json.loads(captions_match.group(1))
+                        caption_tracks = captions_json.get('captionTracks', [])
+                        
+                        # Dil önceliği şablonu: Önce Türkçe, yoksa İngilizce, yoksa ilk sıradaki dil
+                        target_track = None
+                        for track in caption_tracks:
+                            if track.get('languageCode') == 'tr':
+                                target_track = track
+                                break
+                        if not target_track:
+                            for track in caption_tracks:
+                                if track.get('languageCode') == 'en':
+                                    target_track = track
+                                    break
+                        if not target_track and caption_tracks:
+                            target_track = caption_tracks[0]
                             
-                            start_time = saniye_to_srt_zaman(start)
-                            end_time = saniye_to_srt_zaman(end)
-                            metin = text_node.text or ""
-                            metin = metin.replace('&amp;', '&').replace('&quot;', '"').replace('&#39;', "'")
+                        if not target_track:
+                            st.error("Transkript veri tüneli oluşturulamadı.")
+                        else:
+                            # Seçilen altyazı XML URL'sini yakalayıp srv1 standardına zorluyoruz
+                            base_sub_url = target_track.get('baseUrl')
+                            if "&fmt=" not in base_sub_url:
+                                base_sub_url += "&fmt=srv1"
+                                
+                            sub_req = urllib.request.Request(base_sub_url, headers=headers)
+                            xml_data = urllib.request.urlopen(sub_req).read().decode('utf-8')
                             
-                            srt_icerik += f"{i}\n{start_time} --> {end_time}\n{metin.strip()}\n\n"
-                    except Exception:
-                        srt_icerik = xml_data
-                    
-                    st.markdown("<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; text-align: center; margin-top: 15px;'>İşlem başarıyla tamamlandı!</p>", unsafe_allow_html=True)
-                    
-                    st.download_button(
-                        label="Dosyayı İndir (.SRT)",
-                        data=srt_icerik.encode('utf-8'),
-                        file_name=f"{guvenli_baslik}.srt",
-                        mime="text/plain"
-                    )
-            
-        except Exception as e:
-            st.error(f"Sistem raporu hatası: {e}")
+                            srt_icerik = ""
+                            root = ET.fromstring(xml_data)
+                            for i, text_node in enumerate(root.findall('text'), start=1):
+                                start = float(text_node.attrib.get('start', 0))
+                                dur = float(text_node.attrib.get('dur', 0))
+                                end = start + dur
+                                
+                                start_time = saniye_to_srt_zaman(start)
+                                end_time = saniye_to_srt_zaman(end)
+                                metin = text_node.text or ""
+                                metin = metin.replace('&amp;', '&').replace('&quot;', '"').replace('&#39;', "'")
+                                
+                                srt_icerik += f"{i}\n{start_time} --> {end_time}\n{metin.strip()}\n\n"
+                            
+                            st.markdown("<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; text-align: center; margin-top: 15px;'>İşlem 1 saniyede tamamlandı!</p>", unsafe_allow_html=True)
+                            
+                            st.download_button(
+                                label="Dosyayı İndir (.SRT)",
+                                data=srt_icerik.encode('utf-8'),
+                                file_name=f"{guvenli_baslik}.srt",
+                                mime="text/plain"
+                            )
+            except Exception as e:
+                st.error(f"Sistem raporu hatası: {e}")
 
 st.markdown('<div class="premium-ad-placement" style="margin-top: 50px;">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
