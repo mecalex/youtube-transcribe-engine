@@ -3,6 +3,7 @@ import os
 import requests
 import json
 import xml.etree.ElementTree as ET
+import re
 from urllib.parse import urlparse, parse_qs
 
 def saniye_to_srt_zaman(saniye):
@@ -13,36 +14,22 @@ def saniye_to_srt_zaman(saniye):
     return f"{saat:02d}:{dakika:02d}:{sn:02d},{milisaniye:03d}"
 
 def guvenli_dosya_adi(isim):
-    import re
     return re.sub(r'[\\/*?:"<>|]', "", isim)
 
 def youtube_id_temizle(url_girdi):
     url_girdi = url_girdi.strip()
-    # Eğer doğrudan 11 haneli temiz ID girildiyse güvenle döndür
+    
+    # Doğrudan 11 haneli temiz ID girildiyse güvenle döndür
     if len(url_girdi) == 11 and "/" not in url_girdi and "=" not in url_girdi:
         return url_girdi
         
-    try:
-        parsed_url = urlparse(url_girdi)
-        # Kısaltılmış bağlantı tüneli (youtu.be/ID)
-        if parsed_url.hostname in ('youtu.be', 'www.youtu.be'):
-            return parsed_url.path[1:12]
-            
-        # Standart, mobil, shorts ve gömülü bağlantı mimarileri
-        if parsed_url.hostname in ('youtube.com', '://youtube.com', '://youtube.com'):
-            if parsed_url.path == '/watch':
-                query_params = parse_qs(parsed_url.query)
-                v_list = query_params.get('v')
-                # Hatalı köşeli parantez sızıntısını önleyen kesin string dönüşümü [0]
-                if v_list and isinstance(v_list, list):
-                    return v_list[0].strip()
-            if parsed_url.path.startswith(('/embed/', '/v/', '/shorts/')):
-                parts = parsed_url.path.split('/')
-                for part in parts:
-                    if part and len(part.strip()) == 11:
-                        return part.strip()
-    except Exception:
-        pass
+    # Tüm YouTube varyasyonlarını (shorts, m., www., zaman damgası ve si parametresi) çözen regex mimarisi
+    pattern = r'(?:https?:\/\/)?(?:www\.|m\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|shorts\/|watch\?v=|watch\?.+&v=))([\w-]{11})'
+    
+    match = re.search(pattern, url_girdi)
+    if match:
+        return match.group(1)
+        
     return None
 
 st.set_page_config(page_title="Transcription Engine", page_icon="⚙️", layout="centered")
@@ -130,7 +117,8 @@ if st.button("Çözümlemeyi Başlat"):
         else:
             try:
                 with st.spinner("Yapay zekâ transkript veri kanallarına sızıyor..."):
-                    api_url = f"https://://youtube.com/watch?v={video_id}"
+                    # Protokol hatası (https://://) düzeltildi
+                    api_url = f"https://youtube.com{video_id}"
                     headers = {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                         'Accept-Language': 'tr,tr-TR;q=0.9,en-US;q=0.8,en;q=0.7'
@@ -139,7 +127,6 @@ if st.button("Çözümlemeyi Başlat"):
                     response = requests.get(api_url, headers=headers, timeout=15)
                     html_data = response.text
                     
-                    import re
                     baslik_match = re.search(r'<title>(.*?)</title>', html_data)
                     video_baslik = baslik_match.group(1).replace("- YouTube", "").strip() if baslik_match else "transkript_output"
                     guvenli_baslik = guvenli_dosya_adi(video_baslik)
