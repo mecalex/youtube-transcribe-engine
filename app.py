@@ -107,16 +107,15 @@ if st.button("Çözümlemeyi Başlat"):
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            # Hatalara yol açan restriktif 'format' anahtarı tamamen kaldırıldı.
-            # Sıralama ve bulma stratejisi akıllı sorting katmanına devredildi.
+            # Format filtresi tamamen kaldırılarak None yapıldı (Hata fırlatma engellendi)
+            'format': None,
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
-            'format_sort': ['res:720', 'ext:mp4:m4a', 'vcodec:h264', 'acodec:aac'],
-            'merge_output_format': 'mp4',
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'web_embedded'],
+                    # SABR veri merkezi kısıtlamalarını bypass eden kararlı ios ve android embedded mimarisi
+                    'player_client': ['ios', 'android_embedded', 'web_embedded'],
                     'skip': ['webpage', 'hls']
                 }
             },
