@@ -109,9 +109,8 @@ if st.button("Çözümlemeyi Başlat"):
             'writesubtitles': True,
             'writeautomaticsub': True,
             'subtitleslangs': ['tr', 'en', 'all'],
-            # JavaScript runtime tetikleyicisi node olarak kilitlendi
-            'js_runtimes': ['node'],
-            # YouTube n-challenge algoritmasını çözmek için canlı imza havuzu bağlanıyor
+            # js_runtimes format hatasını gideren kurumsal sözlük şablonu
+            'js_runtimes': {'node': {}},
             'remote_components': 'ejs:github',
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
             'extractor_args': {
@@ -143,9 +142,9 @@ if st.button("Çözümlemeyi Başlat"):
             elif 'en' in automatic_captions:
                 altyazi_listesi = automatic_captions['en']
             elif len(subtitles) > 0:
-                altyazi_listesi = list(subtitles.values())
+                altyazi_listesi = list(subtitles.values())[0] if isinstance(subtitles, dict) else list(subtitles.values())
             elif len(automatic_captions) > 0:
-                altyazi_listesi = list(automatic_captions.values())
+                altyazi_listesi = list(automatic_captions.values())[0] if isinstance(automatic_captions, dict) else list(automatic_captions.values())
                 
             if altyazi_listesi is None:
                 st.error("Bu videoya ait herhangi bir resmi transkript veya altyazı verisi bulunamadı.")
