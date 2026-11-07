@@ -109,9 +109,9 @@ if st.button("Çözümlemeyi Başlat"):
             'writesubtitles': True,
             'writeautomaticsub': True,
             'subtitleslangs': ['tr', 'en', 'all'],
-            # js_runtimes format hatasını gideren kurumsal sözlük şablonu
             'js_runtimes': {'node': {}},
-            'remote_components': 'ejs:github',
+            # Liste ayrışma hatasını (String Unpacking) çözen kurumsal liste şablonu
+            'remote_components': ['ejs:github'],
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
             'extractor_args': {
                 'youtube': {
