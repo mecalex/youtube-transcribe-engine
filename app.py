@@ -105,7 +105,7 @@ if st.button("Çözümlemeyi Başlat"):
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            # Ağır video/ses dosyalarını tamamen pas geçip, sadece resmi transkript verilerini yakalar.
+            # IP engeline takılan ağır medya indirme süreçleri tamamen pas geçiliyor
             'skip_download': True,
             'writesubtitles': True,
             'writeautomaticsub': True,
@@ -115,18 +115,16 @@ if st.button("Çözümlemeyi Başlat"):
             'quiet': True,
         }
         try:
-            with st.spinner("Yapay zekâ transkript verilerini YouTube sunucularından çekiyor..."):
+            with st.spinner("Yapay zekâ transkript verilerini YouTube tünellerinden çekiyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=False)
                     video_baslik = info_dict.get('title', 'transkript_output')
                     
-                    # YouTube'un sunduğu altyazı sözlüğünü kontrol ediyoruz
                     subtitles = info_dict.get('subtitles', {})
                     automatic_captions = info_dict.get('automatic_captions', {})
             
             guvenli_baslik = guvenli_dosya_adi(video_baslik)
             
-            # Öncelikle Türkçe altyazıları arıyoruz, yoksa otomatik transkriptlere veya İngilizceye bakıyoruz
             altyazi_listesi = None
             if 'tr' in subtitles:
                 altyazi_listesi = subtitles['tr']
@@ -142,21 +140,22 @@ if st.button("Çözümlemeyi Başlat"):
                 altyazi_listesi = list(automatic_captions.values())[0]
                 
             if altyazi_listesi is None:
-                st.error("Bu videoya ait herhangi bir transkript veya altyazı verisi bulunamadı.")
+                st.error("Bu videoya ait herhangi bir resmi transkript veya altyazı verisi bulunamadı.")
             else:
-                # Altyazı formatları arasından en temiz metin veren 'srv1' veya 'json3' / 'vtt' seçilir
                 srv1_url = None
-                for sub in altyazi_listesi:
-                    if sub.get('ext') == 'srv1':
-                        srv1_url = sub.get('url')
-                        break
-                if not srv1_url and altyazi_listesi:
-                    srv1_url = altyazi_listesi[0].get('url')
+                if isinstance(altyazi_listesi, list):
+                    for sub in altyazi_listesi:
+                        if sub.get('ext') == 'srv1':
+                            srv1_url = sub.get('url')
+                            break
+                    if not srv1_url and altyazi_listesi:
+                        srv1_url = altyazi_listesi[0].get('url')
+                else:
+                    srv1_url = altyazi_listesi.get('url')
                     
                 if not srv1_url:
                     st.error("Transkript veri tüneli oluşturulamadı.")
                 else:
-                    # Seçilen altyazı verisini sunucuya çekip doğrudan SRT formatına dönüştürüyoruz
                     import urllib.request
                     import xml.etree.ElementTree as ET
                     
@@ -165,25 +164,22 @@ if st.button("Çözümlemeyi Başlat"):
                     
                     srt_icerik = ""
                     try:
-                        # XML (srv1) formatını saniye saniye standart SRT biçimine döküyoruz
                         root = ET.fromstring(xml_data)
                         for i, text_node in enumerate(root.findall('text'), start=1):
-                            start = float(text_node.set('start') or text_node.attrib.get('start', 0))
-                            dur = float(text_node.set('dur') or text_node.attrib.get('dur', 0))
+                            start = float(text_node.attrib.get('start', 0))
+                            dur = float(text_node.attrib.get('dur', 0))
                             end = start + dur
                             
                             start_time = saniye_to_srt_zaman(start)
                             end_time = saniye_to_srt_zaman(end)
                             metin = text_node.text or ""
-                            # HTML entity temizliği (&amp; -> & vb.)
                             metin = metin.replace('&amp;', '&').replace('&quot;', '"').replace('&#39;', "'")
                             
                             srt_icerik += f"{i}\n{start_time} --> {end_time}\n{metin.strip()}\n\n"
                     except Exception:
-                        # Eğer srv1 yerine düz VTT/JSON geldiyse ham metni koruyoruz
                         srt_icerik = xml_data
                     
-                    st.markdown("<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; text-align: center; margin-top: 15px;'>İşlem 1 saniyede tamamlandı!</p>", unsafe_allow_html=True)
+                    st.markdown("<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; text-align: center; margin-top: 15px;'>İşlem başarıyla tamamlandı!</p>", unsafe_allow_html=True)
                     
                     st.download_button(
                         label="Dosyayı İndir (.SRT)",
