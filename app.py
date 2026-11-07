@@ -4,7 +4,6 @@ import re
 from yt_dlp import YoutubeDL
 from faster_whisper import WhisperModel
 
-# Saniyeyi SRT formatına çeviren yardımcı fonksiyon
 def saniye_to_srt_zaman(saniye):
     saat = int(saniye // 3600)
     dakika = int((saniye % 3600) // 60)
@@ -15,18 +14,14 @@ def saniye_to_srt_zaman(saniye):
 def guvenli_dosya_adi(isim):
     return re.sub(r'[\\/*?:"<>|]', "", isim)
 
-# --- DENGELİ, MAT VE GÖZ DOSTU KURUMSAL TASARIM (READER DARK MODE) ---
 st.set_page_config(page_title="Transcription Engine", page_icon="⚙️", layout="centered")
 
 st.markdown("""
     <style>
-    /* Gözü Yormayan Mat Koyu Kurşuni Arka Plan */
     .stApp {
         background-color: #1a1f2c !important;
         font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    
-    /* Soft Kirli Beyaz ve Ağırbaşlı Başlıklar */
     .brand-header {
         font-size: 1.6rem !important;
         font-weight: 600;
@@ -42,8 +37,6 @@ st.markdown("""
         font-size: 0.9rem;
         margin-bottom: 40px;
     }
-    
-    /* Mat ve Şeffaf Füme Giriş Çubuğu */
     .stTextInput>div>div>input {
         background-color: #242b3d !important;
         color: #f1f5f9 !important;
@@ -57,8 +50,6 @@ st.markdown("""
         border-color: #64748b !important;
         box-shadow: 0 0 0 1px #64748b !important;
     }
-    
-    /* SİTE DOKUSUYLA BÜTÜNLEŞİK YUMUŞAK REKLAM BANTLARI */
     .premium-ad-placement {
         text-align: center;
         font-size: 0.75rem;
@@ -67,8 +58,6 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
-    
-    /* PARLAMAYAN, MAT VE NET KOYU BUTON */
     div.stButton > button:first-child {
         background-color: #f1f5f9 !important;
         color: #0f172a !important;
@@ -84,8 +73,6 @@ st.markdown("""
     div.stButton > button:first-child:hover {
         background-color: #e2e8f0 !important;
     }
-    
-    /* PREMIUM MAT İNDİRME PANELİ */
     div[data-testid="stDownloadButton"] > button {
         background-color: #242b3d !important;
         color: #f1f5f9 !important;
@@ -100,22 +87,16 @@ st.markdown("""
         background-color: #2e374e !important;
         border-color: #475569 !important;
     }
-    
-    /* Varsayılan Kalabalığı Gizleme */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# --- İÇERİK KATMANI ---
 st.markdown('<div class="brand-header">transcribe.engine</div>', unsafe_allow_html=True)
 st.markdown('<div class="brand-sub">Yapay zekâ destekli profesyonel ses deşifre ve altyazı servis istasyonu.</div>', unsafe_allow_html=True)
-
-# 💰 REKLAM YERLEŞİMİ 1 (Uyumlu Mat Reklam Bandı)
 st.markdown('<div class="premium-ad-placement">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
 
-# Girdi Alanı
 video_url = st.text_input("YOUTUBE URL", placeholder="YouTube video bağlantısını buraya girin...", label_visibility="collapsed")
 
 if st.button("Çözümlemeyi Başlat"):
@@ -126,14 +107,14 @@ if st.button("Çözümlemeyi Başlat"):
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            # YouTube format engellerini esnek ceilling yapısıyla tamamen devre dışı bırakan yeni nesil evrensel seçici
-            'format': 'bestaudio*+bestvideo/best',
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
+            'format_sort': ['res:720', 'ext:mp4:m4a', 'vcodec:h264', 'acodec:aac'],
+            'merge_output_format': 'mp4',
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web_embedded', 'web'],
+                    'player_client': ['android', 'web_embedded'],
                     'skip': ['webpage', 'hls']
                 }
             },
@@ -164,7 +145,6 @@ if st.button("Çözümlemeyi Başlat"):
             
             st.markdown(f"<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; text-align: center; margin-top: 15px;'>İşlem tamamlandı. Analiz Dili: {info.language.upper()}</p>", unsafe_allow_html=True)
             
-            # --- İNDİRME PANELİ ---
             st.download_button(
                 label="Dosyayı İndir (.SRT)",
                 data=srt_icerik.encode('utf-8'),
@@ -179,5 +159,4 @@ if st.button("Çözümlemeyi Başlat"):
             if os.path.exists(gecici_ses + ".mp3"):
                 os.remove(gecici_ses + ".mp3")
 
-# 💰 REKLAM YERLEŞİMİ 2 (Alt Mat Reklam Bandı)
 st.markdown('<div class="premium-ad-placement" style="margin-top: 50px;">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
