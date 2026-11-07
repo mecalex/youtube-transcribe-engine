@@ -126,7 +126,8 @@ if st.button("Çözümlemeyi Başlat"):
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            'format': 'bestaudio/best/b',
+            # YouTube format engellerini esnek ceilling yapısıyla tamamen devre dışı bırakan yeni nesil evrensel seçici
+            'format': 'bestaudio*+bestvideo/best',
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
