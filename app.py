@@ -16,9 +16,10 @@ def guvenli_dosya_adi(isim):
     return re.sub(r'[\\/*?:"<>|]', "", isim)
 
 def youtube_id_bul(url):
-    # Kullanıcı sadece ID girse bile adresi bozmadan temizleyen gelişmiş regex
+    # Kullanıcı yanlışlıkla sadece 11 haneli Video ID girse bile sistemi bozmaz
     if len(url.strip()) == 11 and re.match(r'^[a-zA-Z0-9_-]{11}$', url.strip()):
         return url.strip()
+    # Gelişmiş regex tüneli; yapıştırılan her türlü kirli URL'den sadece ID'yi çeker
     pattern = r'(?:v=|\/v\/|embed\/|youtu\.be\/|\/shorts\/|^)([a-zA-Z0-9_-]{11})'
     match = re.search(pattern, url)
     return match.group(1) if match else None
@@ -105,7 +106,7 @@ st.markdown("""
 st.markdown('<div class="brand-header">transcribe.engine</div>', unsafe_allow_html=True)
 st.markdown('<div class="brand-sub">Yapay zekâ destekli profesyonel ses deşifre ve altyazı servis istasyonu.</div>', unsafe_allow_html=True)
 
-# 💰 REKLAM YERLEŞİMİ 1 (Doğal Üst Bant)
+# 💰 REKLAM YERLEŞİMİ 1 (Göz Dostu Üst Reklam Bandı)
 st.markdown('<div class="premium-ad-placement">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
 
 video_url = st.text_input("YOUTUBE URL", placeholder="YouTube video bağlantısını buraya girin...", label_visibility="collapsed")
@@ -119,7 +120,7 @@ if st.button("Çözümlemeyi Başlat"):
             st.error("Geçerli bir YouTube Video ID'si tespit edilemedi. Lütfen linki tam ve doğru girin.")
         else:
             try:
-                with st.spinner("Yapay zekâ transkript veri kanallarına sızıyor..."):
+                with st.spinner("Yapay zekâ resmi transkript veri kanallarına sızıyor..."):
                     api_url = f"https://youtube.com{video_id}"
                     headers = {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -152,7 +153,7 @@ if st.button("Çözümlemeyi Başlat"):
                                     target_track = track
                                     break
                         if not target_track and caption_tracks:
-                            target_track = caption_tracks[0]
+                            target_track = caption_tracks
                             
                         if not target_track:
                             st.error("Transkript veri tüneli oluşturulamadı.")
@@ -189,5 +190,5 @@ if st.button("Çözümlemeyi Başlat"):
             except Exception as e:
                 st.error(f"Sistem raporu hatası: {e}")
 
-# 💰 REKLAM YERLEŞİMİ 2 (Mat Alt Bant)
+# 💰 REKLAM YERLEŞİMİ 2 (Göz Dostu Alt Reklam Bandı)
 st.markdown('<div class="premium-ad-placement" style="margin-top: 50px;">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
