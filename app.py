@@ -16,6 +16,7 @@ def guvenli_dosya_adi(isim):
 
 st.set_page_config(page_title="Transcription Engine", page_icon="⚙️", layout="centered")
 
+# ... (CSS kısmı aynı kalıyor, değiştirmene gerek yok) ...
 st.markdown("""
     <style>
     .stApp {
@@ -107,24 +108,19 @@ if st.button("Çözümlemeyi Başlat"):
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            # Format filtresi tamamen kaldırılarak None yapıldı (Hata fırlatma engellendi)
-            'format': None,
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
-            'extractor_args': {
-                'youtube': {
-                    # SABR veri merkezi kısıtlamalarını bypass eden kararlı ios ve android embedded mimarisi
-                    'player_client': ['ios', 'android_embedded', 'web_embedded'],
-                    'skip': ['webpage', 'hls']
-                }
-            },
+            # ÇÖZÜM: Format seçimini esnek tutuyoruz. En iyi sesi al, videoyu alma.
+            'format': 'bestaudio/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
                 'preferredquality': '128', 
             }],
             'quiet': True,
+            # ÖNEMLİ: Sadece audio çektiğimiz için merge_output_format ve extractor_args'a gerek yok.
+            # player_client'i kaldırıyoruz çünkü default client en stabil çalışır.
         }
         try:
             with st.spinner("Kaynak ayrıştırılıyor..."):
