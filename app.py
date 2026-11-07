@@ -1,3 +1,4 @@
+python
 import streamlit as st
 import os
 import re
@@ -123,15 +124,12 @@ if st.button("Çözümlemeyi Başlat"):
         st.warning("İşlem için geçerli bir video bağlantısı tanımlanmadı.")
     else:
         gecici_ses = "web_gecici_audio"
-        
-        # Bulut sunucunun dizin yapısına göre cookies.txt yolunu kesinleştiriyoruz
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            'format': 'bestaudio/best',
+            'format': 'bestaudio/best/b',
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
-            # YouTube bot filtresini ve "Sign in" kısıtlamasını tamamen deaktif eden entegrasyon
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
             'extractor_args': {
                 'youtube': {
@@ -147,7 +145,7 @@ if st.button("Çözümlemeyi Başlat"):
             'quiet': True,
         }
         try:
-            with st.spinner("Kaynak ayrıştırılıyor ve ses akışı doğrulanıyor..."):
+            with st.spinner("Kaynak ayrıştırılıyor ve ses akışı çekiliyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=True)
                     video_baslik = info_dict.get('title', 'transkript_output')
@@ -183,3 +181,4 @@ if st.button("Çözümlemeyi Başlat"):
 
 # 💰 REKLAM YERLEŞİMİ 2 (Alt Mat Reklam Bandı)
 st.markdown('<div class="premium-ad-placement" style="margin-top: 50px;">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
+Kodu dikkatli kullanın.
