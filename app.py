@@ -16,6 +16,7 @@ def guvenli_dosya_adi(isim):
 
 st.set_page_config(page_title="Transcription Engine", page_icon="⚙️", layout="centered")
 
+# CSS kısmı aynı...
 st.markdown("""
     <style>
     .stApp {
@@ -107,35 +108,52 @@ if st.button("Çözümlemeyi Başlat"):
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            # Hataya sebep olan 'format' anahtarı tamamen silindi.
-            # yt-dlp sunucunun erişebildiği en kararlı akışı otomatik yakalar.
             'outtmpl': gecici_ses,
             'js_runtimes': {'node': {}},
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['ios', 'android_embedded', 'web_embedded'],
-                    'skip': ['webpage', 'hls']
-                }
-            },
+            # ÇÖZÜM 1: Sadece en iyi audio'yu çek, fallback olarak herhangi bir şey al
+            'format': 'bestaudio/best',
+            # ÇÖZÜM 2: Format bulunamazsa hata vermek yerine varsayılan davranışa dön
+            'ignoreerrors': True,
+            # ÇÖZÜM 3: FFmpeg ile sadece audio extraction yap
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
                 'preferredquality': '128', 
             }],
             'quiet': True,
+            'no_warnings': True,
+            # ÇÖZÜM 4: Sadece metadata çek, sonra indir (daha stabil)
+            'noplaylist': True,
+            'restrictfilenames': True,
         }
+        
         try:
             with st.spinner("Kaynak ayrıştırılıyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=True)
+                    
+                    # Eğer extract_info None dönerse (hata durumunda)
+                    if info_dict is None:
+                        raise Exception("Video bilgisi alınamadı. Lütfen URL'yi kontrol edin.")
+                    
                     video_baslik = info_dict.get('title', 'transkript_output')
+            
+            # Kontrol: Dosya gerçekten oluştu mu?
+            audio_path = gecici_ses + ".mp3"
+            if not os.path.exists(audio_path):
+                # Bazen dosya adı farklı olabilir, kontrol et
+                possible_files = [f for f in os.listdir('.') if f.startswith(gecici_ses)]
+                if possible_files:
+                    audio_path = possible_files[0]
+                else:
+                    raise Exception("Ses dosyası oluşturulamadı. Format hatası devam ediyor olabilir.")
             
             guvenli_baslik = guvenli_dosya_adi(video_baslik)
             
             with st.spinner("Metinleştirme motoru çalışıyor..."):
                 model = WhisperModel("tiny", device="cpu", compute_type="int8")
-                segments, info = model.transcribe(gecici_ses + ".mp3", beam_size=3)
+                segments, info = model.transcribe(audio_path, beam_size=3)
                 
                 srt_icerik = ""
                 for i, segment in enumerate(segments, start=1):
@@ -153,10 +171,20 @@ if st.button("Çözümlemeyi Başlat"):
             )
             
         except Exception as e:
-            st.error(f"Sistem raporu hatası: {e}")
+            error_msg = str(e)
+            # Kullanıcıya teknik detay gösterme, genel mesaj ver
+            if "Requested format is not available" in error_msg:
+                st.error("Video formatı desteklenmiyor. Lütfen başka bir video deneyin veya cookies.txt dosyası ekleyin.")
+            elif "Sign in to confirm you're not a bot" in error_msg:
+                st.error("YouTube bot koruması aktif. cookies.txt dosyası gerekiyor.")
+            else:
+                st.error(f"Beklenmeyen bir hata oluştu: {error_msg[:100]}...")
             
         finally:
-            if os.path.exists(gecici_ses + ".mp3"):
-                os.remove(gecici_ses + ".mp3")
+            # Tüm geçici dosyaları temizle
+            for ext in ['.mp3', '.m4a', '.webm']:
+                temp_file = gecici_ses + ext
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
 
 st.markdown('<div class="premium-ad-placement" style="margin-top: 50px;">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
