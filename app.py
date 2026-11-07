@@ -1,4 +1,3 @@
-python
 import streamlit as st
 import os
 import re
@@ -181,4 +180,3 @@ if st.button("Çözümlemeyi Başlat"):
 
 # 💰 REKLAM YERLEŞİMİ 2 (Alt Mat Reklam Bandı)
 st.markdown('<div class="premium-ad-placement" style="margin-top: 50px;">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
-Kodu dikkatli kullanın.
