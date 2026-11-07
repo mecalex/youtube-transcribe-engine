@@ -1,9 +1,9 @@
 import streamlit as st
 import os
 import re
-import subprocess
 from yt_dlp import YoutubeDL
 from faster_whisper import WhisperModel
+
 
 def saniye_to_srt_zaman(saniye):
     saat = int(saniye // 3600)
@@ -12,166 +12,109 @@ def saniye_to_srt_zaman(saniye):
     milisaniye = int((saniye - int(saniye)) * 1000)
     return f"{saat:02d}:{dakika:02d}:{sn:02d},{milisaniye:03d}"
 
+
 def guvenli_dosya_adi(isim):
     return re.sub(r'[\\/*?:"<>|]', "", isim)
+
 
 st.set_page_config(page_title="Transcription Engine", page_icon="⚙️", layout="centered")
 
 st.markdown("""
     <style>
-    .stApp {
-        background-color: #1a1f2c !important;
-        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    .brand-header {
-        font-size: 1.6rem !important;
-        font-weight: 600;
-        color: #e2e8f0 !important;
-        text-align: center;
-        margin-top: 40px;
-        margin-bottom: 4px;
-        letter-spacing: -0.3px;
-    }
-    .brand-sub {
-        color: #8da2bb;
-        text-align: center;
-        font-size: 0.9rem;
-        margin-bottom: 40px;
-    }
-    .stTextInput>div>div>input {
-        background-color: #242b3d !important;
-        color: #f1f5f9 !important;
-        border: 1px solid #334155 !important;
-        border-radius: 6px !important;
-        padding: 12px 16px !important;
-        font-size: 0.95rem !important;
-        transition: all 0.2s ease;
-    }
-    .stTextInput>div>div>input:focus {
-        border-color: #64748b !important;
-        box-shadow: 0 0 0 1px #64748b !important;
-    }
-    .premium-ad-placement {
-        text-align: center;
-        font-size: 0.75rem;
-        color: #475569;
-        margin: 25px 0;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    div.stButton > button:first-child {
-        background-color: #f1f5f9 !important;
-        color: #0f172a !important;
-        font-weight: 500 !important;
-        font-size: 0.9rem !important;
-        padding: 11px 20px !important;
-        border-radius: 6px !important;
-        border: none !important;
-        width: 100% !important;
-        margin-top: 10px;
-        transition: background-color 0.2s ease !important;
-    }
-    div.stButton > button:first-child:hover {
-        background-color: #e2e8f0 !important;
-    }
-    div[data-testid="stDownloadButton"] > button {
-        background-color: #242b3d !important;
-        color: #f1f5f9 !important;
-        font-weight: 500 !important;
-        font-size: 0.9rem !important;
-        border-radius: 6px !important;
-        border: 1px solid #334155 !important;
-        padding: 11px !important;
-        width: 100% !important;
-    }
-    div[data-testid="stDownloadButton"] > button:hover {
-        background-color: #2e374e !important;
-        border-color: #475569 !important;
-    }
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    .stApp { background-color: #1a1f2c !important; font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .brand-header { font-size: 1.6rem !important; font-weight: 600; color: #e2e8f0 !important; text-align: center; margin-top: 40px; margin-bottom: 4px; letter-spacing: -0.3px; }
+    .brand-sub { color: #8da2bb; text-align: center; font-size: 0.9rem; margin-bottom: 40px; }
+    .stTextInput > div > div > input { background-color: #242b3d !important; color: #f1f5f9 !important; border: 1px solid #334155 !important; border-radius: 6px !important; padding: 12px 16px !important; font-size: 0.95rem !important; transition: all 0.2s ease; }
+    .stTextInput > div > div > input:focus { border-color: #64748b !important; box-shadow: 0 0 0 1px #64748b !important; }
+    .premium-ad-placement { text-align: center; font-size: 0.75rem; color: #475569; margin: 25px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+    div.stButton > button:first-child { background-color: #f1f5f9 !important; color: #0f172a !important; font-weight: 500 !important; font-size: 0.9rem !important; padding: 11px 20px !important; border-radius: 6px !important; border: none !important; width: 100% !important; margin-top: 10px; transition: background-color 0.2s ease !important; }
+    div.stButton > button:first-child:hover { background-color: #e2e8f0 !important; }
+    div[data-testid="stDownloadButton"] > button { background-color: #242b3d !important; color: #f1f5f9 !important; font-weight: 500 !important; font-size: 0.9rem !important; border-radius: 6px !important; border: 1px solid #334155 !important; padding: 11px !important; width: 100% !important; }
+    div[data-testid="stDownloadButton"] > button:hover { background-color: #2e374e !important; border-color: #475569 !important; }
+    #MainMenu { visibility: hidden; }
+    footer { visibility: hidden; }
+    header { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="brand-header">transcribe.engine</div>', unsafe_allow_html=True)
-st.markdown('<div class="brand-sub">Yapay zekâ destekli profesyonel ses deşifre ve altyazı servis istasyonu.</div>', unsafe_allow_html=True)
+st.markdown('<div class="brand-sub">Yapay zeka destekli profesyonel ses deşifre ve altyazi servis istasyonu.</div>', unsafe_allow_html=True)
 st.markdown('<div class="premium-ad-placement">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
 
-video_url = st.text_input("YOUTUBE URL", placeholder="YouTube video bağlantısını buraya girin...", label_visibility="collapsed")
+video_url = st.text_input("YOUTUBE URL", placeholder="YouTube video baglantisini buraya girin...", label_visibility="collapsed")
 
-if st.button("Çözümlemeyi Başlat"):
+if st.button("Cozumlemeyi Baslat"):
     if not video_url:
-        st.warning("İşlem için geçerli bir video bağlantısı tanımlanmadı.")
+        st.warning("Islem icin gecerli bir video baglantisi tanimlanmadi.")
     else:
-        # İndirilecek video uzantısını seçiciye bırakmak için jenerik isim verdik
-        gecici_video_taslak = "web_gecici_video"
-        gecici_ses = "web_gecici_audio.mp3"
+        gecici_ses = "web_gecici_audio"
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
-        
+
         ydl_opts = {
-            # YouTube manifesto kısıtlamalarını tamamen ezen EN GENEL joker format kalıbı. 
-            # Sunucu IP'sine ne gösterilirse gösterilsin (en kötü/en hafif video dahil) indirmeyi garanti eder.
-            'format': 'best/bestvideo+bestaudio/worst/all',
-            'outtmpl': gecici_video_taslak + '.%(ext)s',
-            'js_runtimes': {'node': {}},
+            'outtmpl': gecici_ses + '.%(ext)s',
+            'format': 'bestaudio/bestaudio[ext=m4a]/best',
+            'noplaylist': True,
+            'quiet': True,
+            'no_warnings': True,
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web_embedded', 'web'],
-                    'skip': ['webpage', 'hls']
+                    'player_client': ['android_vr', 'tv_embedded', 'web'],
                 }
             },
-            'quiet': True,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
         }
+
         try:
-            with st.spinner("Kaynak ayrıştırılıyor ve video indiriliyor..."):
+            with st.spinner("Kaynak ayristiriliyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=True)
                     video_baslik = info_dict.get('title', 'transkript_output')
-                    # İnen dosyanın gerçek uzantısını tespit ediyoruz (mp4, mkv, webm vb.)
-                    indirilen_ext = info_dict.get('ext', 'mp4')
-            
+
+            audio_path = f"{gecici_ses}.mp3"
+            if not os.path.exists(audio_path):
+                if os.path.exists(f"{gecici_ses}.m4a"):
+                    audio_path = f"{gecici_ses}.m4a"
+                elif os.path.exists(f"{gecici_ses}.webm"):
+                    audio_path = f"{gecici_ses}.webm"
+                else:
+                    raise Exception("Ses dosyasi bulunamadi. Lutfen tekrar deneyin.")
+
             guvenli_baslik = guvenli_dosya_adi(video_baslik)
-            gercek_video_yolu = f"{gecici_video_taslak}.{indirilen_ext}"
-            
-            with st.spinner("Ses katmanı videodan bağımsız olarak ayrıştırılıyor..."):
-                ffmpeg_cmd = [
-                    'ffmpeg', '-y', '-i', gercek_video_yolu, 
-                    '-vn', '-acodec', 'libmp3lame', '-ar', '16000', '-ac', '1', '-ab', '128k', 
-                    gecici_ses
-                ]
-                subprocess.run(ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-            
-            with st.spinner("Metinleştirme motoru çalışıyor..."):
+
+            with st.spinner("Metinlestirme motoru calisiyor..."):
                 model = WhisperModel("tiny", device="cpu", compute_type="int8")
-                segments, info = model.transcribe(gecici_ses, beam_size=3)
-                
+                segments, info = model.transcribe(audio_path, beam_size=3)
+
                 srt_icerik = ""
                 for i, segment in enumerate(segments, start=1):
                     start_time = saniye_to_srt_zaman(segment.start)
                     end_time = saniye_to_srt_zaman(segment.end)
                     srt_icerik += f"{i}\n{start_time} --> {end_time}\n{segment.text.strip()}\n\n"
-            
-            st.markdown(f"<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; text-align: center; margin-top: 15px;'>İşlem tamamlandı. Analiz Dili: {info.language.upper()}</p>", unsafe_allow_html=True)
-            
+
+            st.markdown(
+                f"<p style='color: #cbd5e1; font-size: 0.9rem; font-weight: 500; text-align: center; margin-top: 15px;'>Islem tamamlandi. Analiz Dili: {info.language.upper()}</p>",
+                unsafe_allow_html=True
+            )
+
             st.download_button(
-                label="Dosyayı İndir (.SRT)",
+                label="Dosyayi Indir (.SRT)",
                 data=srt_icerik.encode('utf-8'),
                 file_name=f"{guvenli_baslik}.srt",
                 mime="text/plain"
             )
-            
+
         except Exception as e:
-            st.error(f"Sistem raporu hatası: {e}")
-            
+            st.error(f"Sistem raporu hatasi: {e}")
+
         finally:
-            # Tüm ihtimallere karşı dinamik temizlik mekanizması
-            for ext in ['mp4', 'mkv', 'webm', '3gp', 'flv']:
-                test_path = f"{gecici_video_taslak}.{ext}"
-                if os.path.exists(test_path):
-                    os.remove(test_path)
-            if os.path.exists(gecici_ses):
-                os.remove(gecici_ses)
+            for ext in ['.mp3', '.m4a', '.webm']:
+                temp_file = gecici_ses + ext
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
 
 st.markdown('<div class="premium-ad-placement" style="margin-top: 50px;">— Sponsored Advertisement —</div>', unsafe_allow_html=True)
