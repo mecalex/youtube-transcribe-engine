@@ -105,17 +105,25 @@ if st.button("Çözümlemeyi Başlat"):
         cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
         
         ydl_opts = {
-            # IP engeline takılan ağır medya indirme süreçleri tamamen pas geçiliyor
             'skip_download': True,
             'writesubtitles': True,
             'writeautomaticsub': True,
-            'subtitleslangs': ['tr', 'en', 'all'], 
-            'js_runtimes': {'node': {}},
+            'subtitleslangs': ['tr', 'en', 'all'],
+            # JavaScript runtime tetikleyicisi node olarak kilitlendi
+            'js_runtimes': ['node'],
+            # YouTube n-challenge algoritmasını çözmek için canlı imza havuzu bağlanıyor
+            'remote_components': 'ejs:github',
             'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['web_embedded', 'web'],
+                    'skip': ['webpage', 'hls']
+                }
+            },
             'quiet': True,
         }
         try:
-            with st.spinner("Yapay zekâ transkript verilerini YouTube tünellerinden çekiyor..."):
+            with st.spinner("Yapay zekâ transkript verilerini güvenli tünellerden çekiyor..."):
                 with YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(video_url, download=False)
                     video_baslik = info_dict.get('title', 'transkript_output')
@@ -135,9 +143,9 @@ if st.button("Çözümlemeyi Başlat"):
             elif 'en' in automatic_captions:
                 altyazi_listesi = automatic_captions['en']
             elif len(subtitles) > 0:
-                altyazi_listesi = list(subtitles.values())[0]
+                altyazi_listesi = list(subtitles.values())
             elif len(automatic_captions) > 0:
-                altyazi_listesi = list(automatic_captions.values())[0]
+                altyazi_listesi = list(automatic_captions.values())
                 
             if altyazi_listesi is None:
                 st.error("Bu videoya ait herhangi bir resmi transkript veya altyazı verisi bulunamadı.")
@@ -149,7 +157,7 @@ if st.button("Çözümlemeyi Başlat"):
                             srv1_url = sub.get('url')
                             break
                     if not srv1_url and altyazi_listesi:
-                        srv1_url = altyazi_listesi[0].get('url')
+                        srv1_url = altyazi_listesi[0].get('url') if isinstance(altyazi_listesi[0], dict) else altyazi_listesi
                 else:
                     srv1_url = altyazi_listesi.get('url')
                     
